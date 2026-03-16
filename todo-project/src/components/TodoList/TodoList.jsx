@@ -39,10 +39,6 @@ export function TodoList({ todo, setTodo, getTasksCompleted, buttonActive, filte
     }, [todo, setTodo]); // Now safe to include both!
 
     useEffect(() => {
-        console.log(filterInput)
-    }, [filterInput]);
-
-    useEffect(() => {
         const containerElem = todoContainerRef.current;
         if (containerElem) {
             // Only scroll if the last todo is new
