@@ -7,17 +7,18 @@ import './App.css'
 
 function App() {
 
-  const [todo, setTodo] = useState(() => {
+const [todo, setTodo] = useState(() => {
     const savedTodos = localStorage.getItem("todos");
     if (!savedTodos) return [];
 
     const parsed = JSON.parse(savedTodos);
 
     return parsed.map(t => ({
-      ...t,
-      createdAt: t.createdAt || dayjs().toISOString()
+        ...t,
+        isNew: false,
+        createdAt: t.createdAt || dayjs().toISOString()
     }));
-  });
+});
 
 
   function getTasksCompleted() {
