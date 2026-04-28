@@ -1,11 +1,13 @@
 
 import { useState, useEffect } from "react";
-import dayjs from "dayjs";
 import { WeeklyProgress } from "../WeeklyProgress/WeeklyProgress.jsx";
 import { TodoList } from "../TodoList/TodoList.jsx";
 import { FilterTodo } from "../FilterTodo/FilterTodo.jsx"
 import AddImage from "../../assets/add.svg?react"
 import "./AddTodoInput.css"
+
+// supabase
+import { supabase } from "../../supabase.js";
 
 export function TodoBody({ todo, setTodo, getTasksCompleted }) {
     const [inputValue, setInputValue] = useState("");
@@ -21,24 +23,21 @@ export function TodoBody({ todo, setTodo, getTasksCompleted }) {
     function handleInput(event) {
         const todoValue = event.target.value;
         setInputValue(todoValue);
-    }
+    }    
 
-    function handleAddButton() {
+    async function handleAddButton() {
         if (inputValue.trim() === "") return;
-
-        const newTodo = {
-            id: crypto.randomUUID(),
-            status: false,
-            name: inputValue,
-            createdAt: dayjs().toISOString(),
-            updated: false,
-            isNew: true
+        const {data, error} = await supabase.from("todo").insert({name: inputValue}).select()
+        if(error){
+            console.log(error)
+            return
         }
 
-        setTodo([newTodo, ...todo]);
+        setTodo(currentTodo=>[...currentTodo, ...data])
 
-
+        // clear input box
         setInputValue("");
+
     }
 
     function pressEnterKey(event) {

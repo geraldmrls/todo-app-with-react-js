@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from "react"
+import { useState } from "react"
 import relativeTime from "dayjs/plugin/relativeTime"
 import calendarImage from "../../assets/calendar.svg"
 import EditImage from "../../assets/edit.svg?react"
@@ -8,69 +8,28 @@ import Cirlce from "../../assets/circle.svg?react"
 import Check from "../../assets/check.svg?react"
 import "./TodoList.css"
 import dayjs from "dayjs"
+import { supabase } from "../../supabase"
 
 dayjs.extend(relativeTime);
 
 
 export function TodoList({ todo, setTodo, getTasksCompleted, buttonActive, filterInput }) {
     const [todoEdit, setTodoEdit] = useState(null);
-    const todoContainerRef = useRef(null)
-    const [, setTick] = useState(0);
-
-    // 1. Create a ref to track processed IDs
-    const processedTodos = useRef(new Set());
-
-    useEffect(() => {
-        // Find todos that are isNew AND haven't been processed yet
-        const newItems = todo.filter(t => t.isNew && !processedTodos.current.has(t.id));
-
-        if (newItems.length > 0) {
-            const timeout = setTimeout(() => {
-                setTodo(prevTodos =>
-                    prevTodos.map(t => ({ ...t, isNew: false }))
-                );
-
-                // Mark these IDs as processed so this doesn't run again for them
-                newItems.forEach(t => processedTodos.current.add(t.id));
-            }, 50);
-
-            return () => clearTimeout(timeout);
-        }
-    }, [todo, setTodo]); // Now safe to include both!
-
-    useEffect(() => {
-        const containerElem = todoContainerRef.current;
-        if (containerElem) {
-            // Only scroll if the last todo is new
-            const lastTodo = todo[todo.length - 1];
-            if (lastTodo?.isNew) {
-                containerElem.scrollTop = containerElem.scrollHeight;
-            }
-        }
-    }, [todo]);
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setTick(prev => prev + 1);
-        }, 1000)
-        return () => clearInterval(interval)
-    }, [])
-
 
     if (!todo) return null;
 
-    function deleteTodoButton(idToDelete) {
-        // Add removing class first
-        setTodo(prevTodos =>
-            prevTodos.map(todo =>
-                todo.id === idToDelete ? { ...todo, removing: true } : todo
-            )
-        );
+    async function deleteTodoButton(idToDelete) {
 
-        // Remove from state after animation
-        setTimeout(() => {
-            setTodo(prevTodos => prevTodos.filter(todo => todo.id !== idToDelete));
-        }, 300); // match the CSS transition duration
+        const {error} = await supabase.from("todo").delete().eq("id", idToDelete)
+        if(error){
+            console.log(error)
+            return
+        }
+        setTodo(prev=>{
+            return prev.filter(prevItem=>{
+                return prevItem.id !== idToDelete
+            })
+        })
     }
 
     function editTodoButton(idToEdit) {
@@ -116,44 +75,55 @@ export function TodoList({ todo, setTodo, getTasksCompleted, buttonActive, filte
         setTodo(updatedTodos);
         setTodoEdit(null);
     }
+
     function handleKeyDown(event) {
         if (event.key === "Enter") {
             saveUpdatedTodo()
         }
     }
 
-    function checkTask(idToCheck) {
-        const updatedTodos = todo.map(todoItem => {
-            if (todoItem.id === idToCheck) {
-                return {
-                    ...todoItem,
-                    status: !todoItem.status
-                }
-            }
-            return todoItem;
-        });
-        setTodo(updatedTodos)
+    async function checkTask(idToCheck) {
+        const current = todo.find(t => t.id === idToCheck);
+
+        const newStatus = !current.status;
+
+        const { error } = await supabase
+            .from("todo")
+            .update({ status: newStatus })
+            .eq("id", idToCheck);
+
+        if (error) {
+            console.log(error);
+            return;
+        }
+
+        setTodo(prev =>
+            prev.map(todoItem =>
+                todoItem.id === idToCheck
+                    ? { ...todoItem, status: newStatus }
+                    : todoItem
+            )
+        );
     }
 
     const tasksToShow = todo.filter(todoItem => {
-        const matchesSearch = todoItem.name.toLowerCase().includes(filterInput.toLowerCase());
+        const name = todoItem.name || ""; // 👈 fallback
 
-        if (!matchesSearch) return false; // skip todos that don't match search
+        const matchesSearch = name
+            .toLowerCase()
+            .includes((filterInput || "").toLowerCase());
 
-        if (buttonActive === "ALL") {
-            return true; // show all that match search
-        } else if (buttonActive === "ACTIVE") {
-            return todoItem.status === false; // only active
-        } else if (buttonActive === "COMPLETED") {
-            return todoItem.status === true; // only completed
-        }
+        if (!matchesSearch) return false;
 
-        return true; // fallback
+        if (buttonActive === "ALL") return true;
+        if (buttonActive === "ACTIVE") return todoItem.status === false;
+        if (buttonActive === "COMPLETED") return todoItem.status === true;
+
+        return true;
     });
 
-
     return (
-        <div className="todo-items-container" ref={todoContainerRef}>
+        <div className="todo-items-container">
             {tasksToShow.map(todoElement => {
 
                 const isNew = todoElement.isNew;
